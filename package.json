@@ -1,0 +1,26 @@
+{
+  "name": "game-sync",
+  "version": "0.0.1",
+  "description": "A framework for creating real-time multiplayer games",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/felixbade/game-sync-web.git"
+  },
+  "keywords": [
+    "game",
+    "websocket",
+    "realtime",
+    "networking",
+    "multiplayer"
+  ],
+  "author": "Felix Bade",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/felixbade/game-sync-web/issues"
+  },
+  "homepage": "https://github.com/felixbade/game-sync-web#readme"
+}
