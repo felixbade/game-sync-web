@@ -1,4 +1,6 @@
-class GameStateManager {
+import { v4 as uuidv4 } from 'uuid';
+
+export class GameStateManager {
     constructor(webSocketUrl, gameStateUpdateFunction) {
         this.webSocket = new WebSocket(webSocketUrl);
         this.gameStateUpdateFunction = gameStateUpdateFunction;
@@ -15,9 +17,10 @@ class GameStateManager {
             const data = JSON.parse(event.data);
 
             if (data.type === 'pong') {
-                const clientTime = (Date.now() - data.payload.sentTime) / 2;
-                this.balanceSlidingWindow.addValue(serverTime - clientTime);
-                this.serverClientTimeDiff = this.median(this.balanceSlidingWindow);
+                const clientTime = Date.now()
+                const RTT = clientTime - data.payload.sentTime;
+                this.balanceSlidingWindow.addValue(data.serverTime + RTT/2 - clientTime);
+                this.serverClientTimeDiff = this.balanceSlidingWindow.getMedian();
 
             } else if (data.type === 'gameStateUpdate') {
                 if (this.unverifiedUpdates.includes(data.state.id)) {
@@ -46,8 +49,10 @@ class GameStateManager {
             }
         };
 
-        setInterval(() => this.webSocket.send(JSON.stringify({ type: 'ping', payload: { sentTime: Date.now() } })), 10);
-        setInterval(() => this.updateGameState(), 1000 / 60);
+        this.webSocket.onopen = () => {
+            setInterval(() => this.webSocket.send(JSON.stringify({ type: 'ping', payload: { sentTime: Date.now() } })), 10);
+            setInterval(() => this.updateGameState(), 1000 / 60);
+        }
     }
 
     updateGameState(deltaTime = 1000 / 60) {
