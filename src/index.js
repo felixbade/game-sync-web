@@ -6,15 +6,28 @@ export class GameStateManager {
         this.gameStateUpdateFunction = gameStateUpdateFunction;
 
         this.gameState = {};
+        this.gameStateId = null;
         this.unhandledActions = [];
         this.serverPlayers = [];
-        this.unverifiedUpdates = [];
+        this.unverifiedUpdateIds = [];
 
         this.balanceSlidingWindow = new MedianFilter(2000);
         this.serverClientTimeDiff = 0;
+        this.gameStateUpdateRefreshId = null;
+
+        this.webSocket.onopen = () => {
+            setInterval(
+                () => this.webSocket.send(JSON.stringify({ type: 'ping', payload: { sentTime: Date.now() } })),
+                1000 / 100
+            );
+            this.setGameStateUpdateLoop()
+        };
 
         this.webSocket.onmessage = (event) => {
             const data = JSON.parse(event.data);
+            if (data.type !== 'pong') {
+                console.log(data)
+            }
 
             if (data.type === 'pong') {
                 const clientTime = Date.now()
@@ -23,17 +36,22 @@ export class GameStateManager {
                 this.serverClientTimeDiff = this.balanceSlidingWindow.getMedian();
 
             } else if (data.type === 'gameStateUpdate') {
-                if (this.unverifiedUpdates.includes(data.state.id)) {
+                if (this.unverifiedUpdateIds.includes(data.id)) {
+                    console.log('leading')
                     // This client is leading
-                    this.unverifiedUpdates = this.unverifiedUpdates.filter(
-                        (id) => id !== data.state.id
+                    this.unverifiedUpdateIds = this.unverifiedUpdateIds.filter(
+                        (id) => id !== data.id
                     );
                 } else {
+                    console.log('following')
                     // This client is following
                     this.gameState = data.state;
-                    this.unverifiedUpdates = [];
-                    const deltaT = this.serverTimeEstimate() - data.state.serverTime;
+                    this.gameStateId = data.id;
+                    this.unverifiedUpdateIds = [];
+                    const deltaT = this.serverTimeEstimate() - data.serverTimeEstimate;
+                    clearInterval(this.gameStateUpdateRefreshId)
                     this.updateGameState(deltaT);
+                    this.setGameStateUpdateLoop()
                 }
 
             } else if (data.type === 'playerAction') {
@@ -48,37 +66,38 @@ export class GameStateManager {
                 );
             }
         };
+    }
 
-        this.webSocket.onopen = () => {
-            setInterval(() => this.webSocket.send(JSON.stringify({ type: 'ping', payload: { sentTime: Date.now() } })), 10);
-            setInterval(() => this.updateGameState(), 1000 / 60);
-        }
+    setGameStateUpdateLoop() {
+        this.gameStateUpdateRefreshId = setInterval(
+            () => this.updateGameState(),
+            1000 / 2
+        );
     }
 
     updateGameState(deltaTime = 1000 / 60) {
-        const updatedGameState = this.gameStateUpdateFunction(
+        const oldGameStateId = this.gameStateId;
+        this.gameState = this.gameStateUpdateFunction(
             this.gameState,
             this.unhandledActions,
             this.serverPlayers,
             deltaTime
         );
+        this.gameStateId = uuidv4();
+        this.unhandledActions = [];
 
-        const newStateId = uuidv4();
-        this.unverifiedUpdates.push(newStateId);
+        this.unverifiedUpdateIds.push(this.gameStateId);
 
         this.webSocket.send(
             JSON.stringify({
                 type: 'gameStateUpdate',
-                state: updatedGameState,
+                state: this.gameState,
                 handledActionIds: this.unhandledActions.map((action) => action.id),
-                serverTime: this.serverTimeEstimate(),
-                currentStateId: newStateId,
-                previousStateId: this.gameState.id,
+                serverTimeEstimate: this.serverTimeEstimate(),
+                id: this.gameStateId,
+                basedOnId: oldGameStateId,
             })
         );
-
-        this.gameState = updatedGameState;
-        this.unhandledActions = [];
     }
 
     serverTimeEstimate() {
