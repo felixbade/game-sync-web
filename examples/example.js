@@ -12,4 +12,4 @@ function gameStateUpdateFunction(gameState, unhandledActions, serverPlayers, del
 
 // Use your package to demonstrate the functionality
 // Replace WebSocket URL and implement gameStateUpdateFunction for your needs
-const gameManager = new GameStateManager("ws://karhu.felixbade.fi:3000", gameStateUpdateFunction);
+const gameManager = new GameStateManager("ws://localhost:3000", gameStateUpdateFunction);
