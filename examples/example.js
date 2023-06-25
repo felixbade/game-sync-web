@@ -6,7 +6,12 @@ function gameStateUpdateFunction(gameState, unhandledActions, serverPlayers, del
     // console.log("Unhandled actions:", unhandledActions);
     // console.log("Server players:", serverPlayers);
 
-    // Just return the gameState as it is, if you want to modify the gameState, update it here.
+    if (gameState.time === undefined) {
+        gameState.time = 0;
+    }
+
+    gameState.time += deltaTime;
+
     return gameState;
 }
 

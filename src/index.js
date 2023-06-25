@@ -17,7 +17,7 @@ export class GameStateManager {
         this.gameStateUpdateRefreshId = null;
         this.gameStateUpdateTimeoutId = null;
         this.lastGameUpdateTime = null;
-        this.gameStateUpdateDuration = 1000 / 2;
+        this.gameStateUpdateDuration = 1000 / 20;
 
         this.webSocket.onopen = () => {
             setInterval(
@@ -86,7 +86,7 @@ export class GameStateManager {
             this.gameState,
             this.unhandledActions,
             this.serverPlayers,
-            deltaTime
+            deltaTime / 1000 // milliseconds to seconds
         );
         this.gameStateId = uuidv4();
         this.unhandledActions = [];
