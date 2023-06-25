@@ -13,7 +13,11 @@ export class GameStateManager {
 
         this.balanceSlidingWindow = new MedianFilter(2000);
         this.serverClientTimeDiff = 0;
+
         this.gameStateUpdateRefreshId = null;
+        this.gameStateUpdateTimeoutId = null;
+        this.lastGameUpdateTime = null;
+        this.gameStateUpdateDuration = 1000 / 2;
 
         this.webSocket.onopen = () => {
             setInterval(
@@ -37,21 +41,22 @@ export class GameStateManager {
 
             } else if (data.type === 'gameStateUpdate') {
                 if (this.unverifiedUpdateIds.includes(data.id)) {
-                    console.log('leading')
                     // This client is leading
                     this.unverifiedUpdateIds = this.unverifiedUpdateIds.filter(
                         (id) => id !== data.id
                     );
                 } else {
-                    console.log('following')
                     // This client is following
+                    clearInterval(this.gameStateUpdateRefreshId);
+                    clearTimeout(this.gameStateUpdateTimeoutId);
                     this.gameState = data.state;
                     this.gameStateId = data.id;
                     this.unverifiedUpdateIds = [];
-                    const deltaT = this.serverTimeEstimate() - data.serverTimeEstimate;
-                    clearInterval(this.gameStateUpdateRefreshId)
-                    this.updateGameState(deltaT);
-                    this.setGameStateUpdateLoop()
+                    const deltaT = this.serverTimeEstimate() - data.serverTimeEstimate + this.gameStateUpdateDuration;
+                    this.gameStateUpdateTimeoutId = setTimeout(() => {
+                        this.updateGameState(deltaT);
+                        this.setGameStateUpdateLoop();
+                    }, this.gameStateUpdateDuration);
                 }
 
             } else if (data.type === 'playerAction') {
@@ -70,12 +75,12 @@ export class GameStateManager {
 
     setGameStateUpdateLoop() {
         this.gameStateUpdateRefreshId = setInterval(
-            () => this.updateGameState(),
-            1000 / 2
+            () => this.updateGameState(this.gameStateUpdateDuration),
+            this.gameStateUpdateDuration
         );
     }
 
-    updateGameState(deltaTime = 1000 / 60) {
+    updateGameState(deltaTime) {
         const oldGameStateId = this.gameStateId;
         this.gameState = this.gameStateUpdateFunction(
             this.gameState,
@@ -87,6 +92,7 @@ export class GameStateManager {
         this.unhandledActions = [];
 
         this.unverifiedUpdateIds.push(this.gameStateId);
+        this.lastGameUpdateTime = Date.now();
 
         this.webSocket.send(
             JSON.stringify({
